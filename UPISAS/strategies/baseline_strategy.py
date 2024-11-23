@@ -1,13 +1,17 @@
 from UPISAS.strategy import Strategy
+import math
 
 class BaselineStrategy(Strategy):
 
     def analyze(self):
         """
         Analyze the current state and determine UAV directions based on wind or dynamic fallback.
+
+        Returns:
+            True if analysis was successful, False otherwise.
         """
         try:
-            # Retrieve monitored data
+            # retrieve monitored data
             data = self.knowledge.monitored_data
             constants = data["constants"][0]
             dynamic_values = data["dynamicValues"][0]
@@ -16,7 +20,7 @@ class BaselineStrategy(Strategy):
 
             self.knowledge.analysis_data["uav_directions"] = {}
 
-            # Handle wind conditions
+            # handle wind conditions
             if constants["activateWind"]:
                 if constants["fixedWind"]:
                     # Single-direction wind
@@ -27,7 +31,7 @@ class BaselineStrategy(Strategy):
                     for uav in uav_details:
                         self.knowledge.analysis_data["uav_directions"][uav["id"]] = wind_dir_int
                 else:
-                    # Multi-directional wind
+                    # multi-directional wind
                     first_direction = constants.get("firstDirection", None)
                     second_direction = constants.get("secondDirection", None)
                     first_dir_prob = constants.get("firstDirStrength", None)
@@ -38,15 +42,18 @@ class BaselineStrategy(Strategy):
                     first_dir_int = self.map_wind_direction_to_int(first_direction)
                     second_dir_int = self.map_wind_direction_to_int(second_direction)
 
+                    num_first_dir = math.ceil(len(uav_details) * first_dir_prob)
+
+                    # distribute UAVs based on the calculated counts
                     for i, uav in enumerate(uav_details):
-                        if i < len(uav_details) * first_dir_prob:
+                        if i < num_first_dir:
                             self.knowledge.analysis_data["uav_directions"][
                                 uav["id"]] = first_dir_int
                         else:
                             self.knowledge.analysis_data["uav_directions"][
                                 uav["id"]] = second_dir_int
             else:
-                # Sequential fallback
+                # sequential fallback if wind is not active
                 directions = [0, 1, 2, 3]  # North, East, South, West
                 for i, uav in enumerate(uav_details):
                     self.knowledge.analysis_data["uav_directions"][uav["id"]] = directions[
@@ -66,12 +73,15 @@ class BaselineStrategy(Strategy):
     def plan(self):
         """
         Plan UAV movements based on the analyzed directions.
+
+        Returns:
+            True if planning was successful, False otherwise.
         """
         try:
-            # Retrieve analyzed data
+            # retrieve analyzed data
             analyzed_directions = self.knowledge.analysis_data["uav_directions"]
 
-            # Create the plan data
+            # create the plan data
             self.knowledge.plan_data["uavDetails"] = [
                 {"id": uav_id, "direction": self.map_int_to_direction(direction)}
                 for uav_id, direction in analyzed_directions.items()
