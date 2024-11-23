@@ -27,5 +27,4 @@ class Wildfire(Exemplar):
         if self.exemplar_container.status != "running":
             self.exemplar_container.start()
 
-        # self.exemplar_container.exec_run(cmd=' sh -c "cd C:/Users/Serghei/Desktop/AdaptiveSoft/Wildfire-UAVSim &&'
-        #                                      ' make run" ',detach=True)
+        self.exemplar_container.exec_run(cmd = f' sh -c "cd /usr/src/app && node" ', detach=True)
