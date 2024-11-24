@@ -78,15 +78,38 @@ class BaselineStrategy(Strategy):
             True if planning was successful, False otherwise.
         """
         try:
-            # retrieve analyzed data
+            # retrieve analyzed directions
             analyzed_directions = self.knowledge.analysis_data["uav_directions"]
 
-            # create the plan data
-            self.knowledge.plan_data["uavDetails"] = [
-                {"id": uav_id, "direction": self.map_int_to_direction(direction)}
-                for uav_id, direction in analyzed_directions.items()
-            ]
+            # retrieve current UAV positions from monitored data
+            monitored_data = self.knowledge.monitored_data["dynamicValues"][-1]
+            current_uav_details = monitored_data["uavDetails"]
 
+            self.knowledge.plan_data["uavDetails"] = []
+            for uav in current_uav_details:
+                uav_id = uav["id"]
+                direction = analyzed_directions[uav_id]
+                x, y = uav["x"], uav["y"]  # get current coordinates
+
+                if direction == 0:  # north
+                    y += 1
+                elif direction == 1:  # east
+                    x += 1
+                elif direction == 2:  # south
+                    y -= 1
+                elif direction == 3:  # west
+                    x -= 1
+
+                # Append the UAV details to the plan
+                self.knowledge.plan_data["uavDetails"].append({
+                    "id": uav_id,
+                    "x": x,
+                    "y": y,
+                    "direction": self.map_int_to_direction(direction)
+                })
+
+            print(
+                f"[Plan] Generated plan with UAV coordinates and directions: {self.knowledge.plan_data}")
             return True
         except KeyError as e:
             print(f"[Planning Error] KeyError: {e}")
@@ -97,8 +120,13 @@ class BaselineStrategy(Strategy):
 
     @staticmethod
     def map_wind_direction_to_int(wind_direction):
-        """
-        Map wind direction to integer values as per schema.
+        """Map wind direction to integer values as per schema.
+
+        Args:
+            wind_direction (str): Wind direction string.
+
+        Returns:
+            int: Integer value mapped to wind direction.
         """
         mapping = {
             "north": 0,
@@ -106,12 +134,17 @@ class BaselineStrategy(Strategy):
             "south": 2,
             "west": 3,
         }
-        return mapping.get(wind_direction, 0)  # Default to 0 (north) if wind direction is invalid
+        return mapping.get(wind_direction, 0)
 
     @staticmethod
     def map_int_to_direction(direction):
-        """
-        Map integer values to direction strings as per execute schema.
+        """Map integer values to direction strings as per execute schema.
+
+        Args:
+            direction (int): Integer value representing direction.
+
+        Returns:
+            str: Direction string mapped to integer value.
         """
         mapping = {
             0: "up",
@@ -119,4 +152,4 @@ class BaselineStrategy(Strategy):
             2: "down",
             3: "left",
         }
-        return mapping.get(direction, "up")  # Default to "up" if direction is invalid
+        return mapping.get(direction, "up")
