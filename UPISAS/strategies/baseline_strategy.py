@@ -1,6 +1,7 @@
 from UPISAS.strategy import Strategy
 import math
 
+
 class BaselineStrategy(Strategy):
 
     def analyze(self):
@@ -23,7 +24,7 @@ class BaselineStrategy(Strategy):
             # handle wind conditions
             if constants["activateWind"]:
                 if constants["fixedWind"]:
-                    # Single-direction wind
+                    # single-direction wind
                     wind_direction = constants.get("windDirection", None)
                     if not wind_direction:
                         raise ValueError("Missing 'windDirection' for fixed wind.")
@@ -100,7 +101,7 @@ class BaselineStrategy(Strategy):
                 elif direction == 3:  # west
                     x -= 1
 
-                # Append the UAV details to the plan
+                # append the UAV details to the plan
                 self.knowledge.plan_data["uavDetails"].append({
                     "id": uav_id,
                     "x": x,
@@ -108,8 +109,8 @@ class BaselineStrategy(Strategy):
                     "direction": self.map_int_to_direction(direction)
                 })
 
-            print(
-                f"[Plan] Generated plan with UAV coordinates and directions: {self.knowledge.plan_data}")
+            print(f"[Plan] Generated plan with UAV coordinates and directions: "
+                f"{self.knowledge.plan_data}")
             return True
         except KeyError as e:
             print(f"[Planning Error] KeyError: {e}")
