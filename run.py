@@ -1,10 +1,5 @@
-from UPISAS.exemplars.swim import SWIM
 from UPISAS.exemplars.wildfire import Wildfire
-from UPISAS.strategies.swim_reactive_strategy import ReactiveAdaptationManager
 from UPISAS.strategies.wildfire_strategy import WildfireStrategy
-from UPISAS.exemplar import Exemplar
-from UPISAS.strategies.baseline_strategy import BaselineStrategy
-import signal
 import sys
 import time
 
@@ -16,7 +11,7 @@ if __name__ == '__main__':
     time.sleep(3)
 
     try:
-        strategy = BaselineStrategy(exemplar)
+        strategy = WildfireStrategy(exemplar)
 
         strategy.get_monitor_schema()
         strategy.get_adaptation_options_schema()
