@@ -1,156 +1,148 @@
 from UPISAS.strategy import Strategy
-import math
+import numpy
 
 
 class BaselineStrategy(Strategy):
 
     def analyze(self):
         """
-        Analyze the current state and determine UAV directions based on wind or dynamic fallback.
-
+        Analyze the current state and calculate MR1 and MR2 based on UAV positions and fire details.
         Returns:
             True if analysis was successful, False otherwise.
         """
         try:
-            # retrieve monitored data
+            # Retrieve monitored data
             data = self.knowledge.monitored_data
+            self.knowledge.analysis_data = {}
+
             constants = data["constants"][0]
             dynamic_values = data["dynamicValues"][0]
 
+            fire_details = dynamic_values.get("fireDetails", [])
             uav_details = dynamic_values["uavDetails"]
 
-            self.knowledge.analysis_data["uav_directions"] = {}
+            observation_radius = constants["observationRadius"]
+            burn_rate = constants["burningRate"]
+            safety_distance = constants["securityDistance"]
 
-            # handle wind conditions
+            uav_positions = [(uav["x"], uav["y"]) for uav in uav_details]
+            print(f"[Analysis] UAV positions: {uav_positions}")
+
+            # Calculate MR1 and MR2
+            _, mr1_per_uav, _ = self.aggregate_mr1(uav_positions, fire_details,
+                                                   observation_radius,
+                                                   burn_rate)
+            mr2_risk, _ = self.aggregate_mr2(uav_positions, safety_distance)
+
+            self.knowledge.analysis_data["mr1"] = mr1_per_uav
+            self.knowledge.analysis_data["mr2"] = mr2_risk
+
+            # Analyze UAV directions based on wind
+            self.knowledge.analysis_data["uav_directions"] = {}
             if constants["activateWind"]:
                 if constants["fixedWind"]:
-                    # single-direction wind
-                    wind_direction = constants.get("windDirection", None)
-                    if not wind_direction:
-                        raise ValueError("Missing 'windDirection' for fixed wind.")
-                    wind_dir_int = self.map_wind_direction_to_int(wind_direction)
+                    wind_dir_int = {"east": 0, "west": 2, "south": 1, "north": 3}.get(constants[
+                                                                                       "windDirection"], 0)
                     for uav in uav_details:
                         self.knowledge.analysis_data["uav_directions"][uav["id"]] = wind_dir_int
+                        print(f"UAV {uav['id']} direction: {wind_dir_int}")
                 else:
-                    # multi-directional wind
-                    first_direction = constants.get("firstDirection", None)
-                    second_direction = constants.get("secondDirection", None)
-                    first_dir_prob = constants.get("firstDirStrength", None)
-
-                    if not (first_direction and second_direction and first_dir_prob):
-                        raise ValueError("Multi-directional wind parameters missing.")
-
-                    first_dir_int = self.map_wind_direction_to_int(first_direction)
-                    second_dir_int = self.map_wind_direction_to_int(second_direction)
-
-                    num_first_dir = math.ceil(len(uav_details) * first_dir_prob)
-
-                    # distribute UAVs based on the calculated counts
+                    # Multi-directional wind
+                    first_dir_prob = constants.get("firstDirStrength", 0.5)
+                    num_first_dir = int(len(uav_details) * first_dir_prob)
                     for i, uav in enumerate(uav_details):
-                        if i < num_first_dir:
-                            self.knowledge.analysis_data["uav_directions"][
-                                uav["id"]] = first_dir_int
-                        else:
-                            self.knowledge.analysis_data["uav_directions"][
-                                uav["id"]] = second_dir_int
+                        self.knowledge.analysis_data["uav_directions"][uav["id"]] = 0 if i < num_first_dir else 2
             else:
-                # sequential fallback if wind is not active
-                directions = [0, 1, 2, 3]  # North, East, South, West
+                # Sequential fallback
+                directions = [0, 1, 2, 3]
                 for i, uav in enumerate(uav_details):
-                    self.knowledge.analysis_data["uav_directions"][uav["id"]] = directions[
-                        i % len(directions)]
+                    self.knowledge.analysis_data["uav_directions"][uav["id"]] = directions[i % len(directions)]
 
+            self.knowledge.analysis_data["mr1a"] = self.aggregate_mr1(uav_positions,
+                                                                     fire_details,
+                                                                 data["constants"][0][
+                                                                     "observationRadius"],
+                                                                 data["constants"][0][
+                                                                     "burningRate"])[2]
+            MR1a = self.knowledge.analysis_data["mr1a"]
+
+            print(f"[Analysis] MR1: {mr1_per_uav}, MR2: {mr2_risk}, MR1a: {MR1a}")
             return True
-        except ValueError as e:
-            print(f"[Analysis Error] ValueError: {e}")
-            return False
-        except KeyError as e:
-            print(f"[Analysis Error] KeyError: {e}")
-            return False
         except Exception as e:
-            print(f"[Analysis Error] Unexpected error: {e}")
+            print(f"[Analysis Error] {e}")
             return False
 
     def plan(self):
         """
-        Plan UAV movements based on the analyzed directions.
-
+        Plan UAV movements based on analyzed directions.
         Returns:
             True if planning was successful, False otherwise.
         """
         try:
-            # retrieve analyzed directions
+            # Retrieve analyzed directions and current UAV details
             analyzed_directions = self.knowledge.analysis_data["uav_directions"]
-
-            # retrieve current UAV positions from monitored data
-            monitored_data = self.knowledge.monitored_data["dynamicValues"][-1]
+            monitored_data = self.knowledge.monitored_data["dynamicValues"][0]
             current_uav_details = monitored_data["uavDetails"]
 
             self.knowledge.plan_data["uavDetails"] = []
             for uav in current_uav_details:
                 uav_id = uav["id"]
                 direction = analyzed_directions[uav_id]
-                x, y = uav["x"], uav["y"]  # get current coordinates
 
-                if direction == 0:  # north
-                    y += 1
-                elif direction == 1:  # east
-                    x += 1
-                elif direction == 2:  # south
-                    y -= 1
-                elif direction == 3:  # west
-                    x -= 1
-
-                # append the UAV details to the plan
+                # Append UAV details for execution
                 self.knowledge.plan_data["uavDetails"].append({
                     "id": uav_id,
-                    "x": x,
-                    "y": y,
-                    "direction": self.map_int_to_direction(direction)
+                    "direction": direction,
                 })
 
-            print(f"[Plan] Generated plan with UAV coordinates and directions: "
-                f"{self.knowledge.plan_data}")
+            print(f"[Plan] Planned UAV movements: {self.knowledge.plan_data}")
             return True
-        except KeyError as e:
-            print(f"[Planning Error] KeyError: {e}")
-            return False
         except Exception as e:
-            print(f"[Planning Error] Unexpected error: {e}")
+            print(f"[Planning Error] {e}")
             return False
 
     @staticmethod
-    def map_wind_direction_to_int(wind_direction):
-        """Map wind direction to integer values as per schema.
+    def aggregate_mr1(uav_positions, fire_details, radius, burn_rate):
+        x_ranges = []
+        y_ranges = []
+        mr1_total = 0
+        mr1a = 0
+        mr1 = [0] * len(uav_positions)
 
-        Args:
-            wind_direction (str): Wind direction string.
+        # Calculate area of coverage of UAVs
+        for position in uav_positions:
+            x_ranges.append((position[0] - radius, position[0] + radius))
+            y_ranges.append((position[1] - radius, position[1] + radius))
 
-        Returns:
-            int: Integer value mapped to wind direction.
-        """
-        mapping = {
-            "north": 0,
-            "east": 1,
-            "south": 2,
-            "west": 3,
-        }
-        return mapping.get(wind_direction, 0)
+        # For each covered cell add its utility value
+        for cell in fire_details:
+            added = False
+            for i in range(len(x_ranges)):
+                if x_ranges[i][0] <= cell["x"] <= x_ranges[i][1]:
+                    if y_ranges[i][0] <= cell["y"] <= y_ranges[i][1]:
+                        if cell["burning"] and cell["fuel"] - burn_rate > 0 and not cell["smoke"]:
+                            if not added:
+                                mr1_total += 1
+                                mr1a += 1
+                                added = True
+                            mr1[i] += 1
+                        elif cell["fuel"] > 0 and not cell["smoke"]:
+                            if not added:
+                                mr1_total += cell["burnProbability"]
+                                added = True
+
+        return mr1_total, mr1, mr1a
 
     @staticmethod
-    def map_int_to_direction(direction):
-        """Map integer values to direction strings as per execute schema.
-
-        Args:
-            direction (int): Integer value representing direction.
-
-        Returns:
-            str: Direction string mapped to integer value.
-        """
-        mapping = {
-            0: "up",
-            1: "right",
-            2: "down",
-            3: "left",
-        }
-        return mapping.get(direction, "up")
+    def aggregate_mr2(positions, safety_distance):
+        mr2 = 0
+        mr2_distance = 0
+        for i in range(len(positions)):
+            for j in range(i + 1, len(positions)):
+                a = numpy.array((positions[i][0], positions[i][1]))
+                b = numpy.array((positions[j][0], positions[j][1]))
+                dist = float(numpy.linalg.norm(a - b))
+                if dist < safety_distance:
+                    mr2_distance += (safety_distance - dist)
+                    mr2 += 1
+        return mr2, safety_distance
