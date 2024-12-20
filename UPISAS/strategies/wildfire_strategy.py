@@ -17,6 +17,7 @@ def aggregate_mr1(uav_positions, fire_details, radius, burn_rate):
     y_ranges = []
     mr1_total = 0
     mr1 = [0] * len(uav_positions)
+    mr1a = 0
     # Calculate area of coverage of UAVs
     for position in uav_positions:
         x_ranges.append((position[0] - radius, position[0] + radius))
@@ -31,6 +32,7 @@ def aggregate_mr1(uav_positions, fire_details, radius, burn_rate):
                     if cell["burning"] and cell["fuel"] - burn_rate > 0 and not cell["smoke"]:
                         if not added:
                             mr1_total += 1
+                            mr1a += 1
                             added = True
                         mr1[i] += 1
                     elif cell["fuel"] > 0 and not cell["smoke"]:
@@ -38,7 +40,7 @@ def aggregate_mr1(uav_positions, fire_details, radius, burn_rate):
                             mr1_total += cell["burnProbability"]
                             added = True
 
-    return mr1_total, mr1
+    return mr1_total, mr1, mr1a
 
 def aggregate_mr2(positions, safety_distance):
     """
@@ -120,6 +122,8 @@ class WildfireStrategy(Strategy):
         current_mr2 = aggregate_mr2(current_positions, data["constants"][0]["securityDistance"])[1]
         self.knowledge.analysis_data["mr1"] = current_mr1
         self.knowledge.analysis_data["mr2"] = current_mr2
+        self.knowledge.analysis_data["mr1a"] = aggregate_mr1(current_positions, fire_details, data["constants"][0]["observationRadius"],
+                                data["constants"][0]["burningRate"])[2]
         return True
 
 
