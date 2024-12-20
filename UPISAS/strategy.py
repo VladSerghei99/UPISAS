@@ -28,8 +28,8 @@ class Strategy(ABC):
             validate_schema(fresh_data, self.knowledge.monitor_schema)
         data = self.knowledge.monitored_data
         for key in list(fresh_data.keys()):
-            if key not in data:
-                data[key] = []
+            # if key not in data:
+            data[key] = []
             data[key].append(fresh_data[key])
         if(verbose): print("[Knowledge]\tdata monitored so far: " + str(self.knowledge.monitored_data))
         return True

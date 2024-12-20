@@ -17,12 +17,14 @@ if __name__ == '__main__':
         strategy.get_adaptation_options_schema()
         strategy.get_execute_schema()
 
-        while True:
-            input("Try to adapt?")
+        for i in range(50):
+            # input("Try to adapt?")
             strategy.monitor(verbose=False)
-            if strategy.analyze():
-                if strategy.plan():
-                    strategy.execute()
+            strategy.analyze()
+            print(strategy.knowledge.analysis_data["mr1"][1])
+            print(strategy.knowledge.analysis_data["mr2"][1])
+            strategy.plan()
+            strategy.execute()
             
     except (Exception, KeyboardInterrupt) as e:
         print(str(e))
