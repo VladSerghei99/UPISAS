@@ -30,7 +30,7 @@ if __name__ == '__main__':
             mr1a_history.append(strategy.knowledge.analysis_data["mr1a"])
             strategy.plan()
             strategy.execute()
-        fig, ax = plt.subplots(2, 1, figsize=(8, 6))
+        fig, ax = plt.subplots(3, 1, figsize=(8, 8))
 
         #subplot for aggregate mr1
         ax[0].plot(range(num_steps), mr1a_history, label="Overall coverage", color='black', marker='o')
