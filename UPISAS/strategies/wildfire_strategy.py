@@ -110,8 +110,16 @@ class WildfireStrategy(Strategy):
                                 data["constants"][0]["burningRate"])
             mr2 = aggregate_mr2(position_combination, data["constants"][0]["securityDistance"])
             self.knowledge.analysis_data["nextMetrics"].append((mr1[0], mr2[0]))
-            self.knowledge.analysis_data["mr1"] = mr1
-            self.knowledge.analysis_data["mr2"] = mr2
+
+        # add plotting support
+        current_positions = []
+        for uav in data["dynamicValues"][0]["uavDetails"]:
+            current_positions.append((uav["x"], uav["y"]))
+        current_mr1 = aggregate_mr1(current_positions, fire_details, data["constants"][0]["observationRadius"],
+                                data["constants"][0]["burningRate"])[1]
+        current_mr2 = aggregate_mr2(current_positions, data["constants"][0]["securityDistance"])[1]
+        self.knowledge.analysis_data["mr1"] = current_mr1
+        self.knowledge.analysis_data["mr2"] = current_mr2
         return True
 
 
